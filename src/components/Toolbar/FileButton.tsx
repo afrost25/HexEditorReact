@@ -13,7 +13,7 @@ interface FileButtonProps
 export default function FileButton(props: FileButtonProps)
 {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const { setHex } = useHex();
+    const { hex, setHex, fileName } = useHex();
 
     function handleClick()
     {
@@ -25,6 +25,18 @@ export default function FileButton(props: FileButtonProps)
         }
 
         props.setMenuDisp(menuDisp);
+    }
+
+    function handleSave()
+    {
+        const blob = new Blob([hex as BlobPart], { type: 'application/octet-stream'});
+        const url = URL.createObjectURL(blob);
+        const tempLink = document.createElement('a');
+        tempLink.href = url;
+        tempLink.download = fileName;
+        tempLink.click();
+        URL.revokeObjectURL(url);
+        props.setMenuDisp(MenuDisplay.None);
     }
 
     function handleFileSelect(event: ChangeEvent<HTMLInputElement>)
@@ -56,8 +68,7 @@ export default function FileButton(props: FileButtonProps)
             <div className="border-[#364153] border-2 bg-[#1e2939] absolute z-50 left-0 top-full">
                 <div className="flex flex-col text-white w-25">
                     <button className="hover:bg-[#30415a] transition-color" onClick={() => {fileInputRef.current?.click()}}>Open</button>
-                    <button className="hover:bg-[#30415a] transition-color">Save</button>
-                    <button className="hover:bg-[#30415a] transition-color">Save As...</button>
+                    <button className="hover:bg-[#30415a] transition-color" onClick={handleSave}>Save</button>
                 </div>
             </div>}
             <input

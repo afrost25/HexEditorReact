@@ -1,22 +1,35 @@
-import { useRef, type JSX } from "react"
+import { type JSX, type SetStateAction } from "react"
 import HexCell from "./HexCell"
 import { useHex } from "../HexContext"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import React from "react";
+import type { FocusHexCell, HexAction } from "../../App";
 
 function AddressCell(props: {row: number}): JSX.Element
 {
-    return <td className="text-[#5b6474]" key={props.row}>{`0x${(props.row * 16).toString(16).toUpperCase().padStart(8, '0')}`}</td>
+    return <td className="text-[#5b6474] p-1 pr-4">{`0x${(props.row * 16).toString(16).toUpperCase().padStart(8, '0')}`}</td>
 }
 
-function HexHeader(props: {index: number}): JSX.Element
+function HexHeader(): JSX.Element
 {
-    return <th className="text-[#5b6474] border-b border-[#5b6474] font-normal" key={props.index}>{props.index.toString(16).toUpperCase()}</th>
+    return (
+        <>
+            {Array.from(Array(16).keys()).map((val, index) => 
+                <th className="text-[#5b6474] border-b border-[#5b6474] font-normal p-1 w-10" key={index}>{val.toString(16).toUpperCase()}</th>
+            )}
+        </>
+    );
 }
 
-function ASCIIHeader(props: {index: number}): JSX.Element
+function ASCIIHeader(): JSX.Element
 {
-    return <th className="border-b border-[#5b6474]" key={props.index}></th>
+    return (
+        <>
+            {Array.from(Array(16).keys()).map((_, index) => 
+                <th className="text-[#5b6474] border-b border-[#5b6474] font-normal p-1 w-6" key={index}></th>
+            )}
+        </>
+    );
 }
 
 
@@ -32,7 +45,7 @@ function ASCIICell(props: {hex: number | undefined}):  JSX.Element
         }
     }
 
-    return  <td className="text-[#5b6474]">{asciiVal}</td>
+    return  <td className="text-[#5b6474] p-1 w-6">{asciiVal}</td>
 }
 
 function tryGetHexValue(row: number, col: number, hexData: Uint8Array): number | undefined
@@ -48,58 +61,56 @@ function tryGetHexValue(row: number, col: number, hexData: Uint8Array): number |
     return res;
 }
 
-export default function Editor()
+export interface EditorProps
 {
+    focusCell: FocusHexCell | undefined
+    setFocusCell: React.Dispatch<SetStateAction<FocusHexCell | undefined>>
+    setUndoStack: React.Dispatch<SetStateAction<HexAction[]>>
+    setRedoStack: React.Dispatch<SetStateAction<HexAction[]>>
+}
 
+export default function Editor({focusCell, setFocusCell, setUndoStack, setRedoStack} : EditorProps)
+{
+    const { hex } = useHex();
     const parentRef = React.useRef<HTMLDivElement>(null);
-    const cellRefs = useRef<(HTMLInputElement | null)[]>([]);
-    const {hex, setHex} = useHex();
 
-    const virtualizer = useVirtualizer({
-        count: Math.ceil(hex.length / 16),
+    const rowVirtualizer = useVirtualizer({
+        count: Math.ceil(10000/ 16),
         getScrollElement: () => parentRef.current,
-        estimateSize: () => 32,
-        overscan: 5,
+        estimateSize: () => 28, // Estimate row height
     });
 
     return(
-     <div className="p-2 bg-[#1e2939] rounded-lg border-[#364153] border-2" ref={parentRef}>
-        <table className="border-collapse [&_th]:px-2 [&_th]:py-1 [&_td]:px-2 [&_td]:py-1 font-mono ">
-            <thead>
-                <tr>
-                    <th className="text-[#5b6474] border-b border-[#5b6474] font-normal">Offset</th>
-                    { Array.from({length: 16}, (_, i) => <HexHeader key={i} index={i}/>) }
-                    { Array.from({length: 16}, (_, i) => <ASCIIHeader key={i} index={i}/>) }
-                </tr>
-            </thead>
-        </table>
-        <div ref={parentRef} className="flex-1 overflow-auto" style={{height: 600}}>
-            <div style={{
-                height: virtualizer.getTotalSize(),
-                position: "relative",
-                width: "100%"
-            }}>
-                <table  className="border-collapse [&_th]:px-2 [&_th]:py-1 [&_td]:px-2 [&_td]:py-1 font-mono ">
-                    <tbody className="text-center">
-                        { 
-                            virtualizer.getVirtualItems().map((vr) => (
-                            <tr key={vr.index}>
-                                    <AddressCell row={vr.index} />
-                                    {Array.from({length: 16}, (_, col) => ( 
-                                        <HexCell 
-                                            ref={(el) => { cellRefs.current[vr.index * 16 + col] = el}} 
-                                            key={vr.index * 16 + col} index={vr.index * 16 + col} 
-                                            hex={tryGetHexValue(vr.index, col, hex)} 
-                                            setHex={setHex}
-                                            />
-                                    ))}
-                                    {Array.from({length: 16}, (_, col) => ( <ASCIICell key={vr.index * 16 + col} hex={tryGetHexValue(vr.index, col, hex)}/>))}
-                            </tr>
-                            ))
-                        }
-                    </tbody>
-                </table>
-            </div>
+        <div ref={parentRef} className="h-full w-fit overflow-y-scroll border-[#364153] border-2 bg-[#1e2939] p-2 rounded-lg" onScroll={() => setFocusCell(undefined)}>
+            <table className="border-collapse font-mono text-center table-fixed">
+                <thead>
+                    <tr className="border-b border-[#5b6474]">
+                        <th className="border-b border-[#5b6474] w-28 text-[#5b6474]">Address</th>
+                        <HexHeader />
+                        <ASCIIHeader />
+                    </tr>
+                </thead>
+                <tbody style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+                    {rowVirtualizer.getVirtualItems().map(virtualRow => (
+                        <tr key={virtualRow.index} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualRow.size}px`, transform: `translateY(${virtualRow.start}px)` }}>
+                            <AddressCell row={virtualRow.index} />
+                            {Array.from(Array(16).keys()).map(colIndex => {
+                                return <HexCell key={colIndex} 
+                                                address={virtualRow.index * 16 + colIndex} 
+                                                hex={tryGetHexValue(virtualRow.index, colIndex, hex)} 
+                                                focusCell={focusCell}
+                                                setFocusCell={setFocusCell} 
+                                                setUndoStack={setUndoStack}
+                                                setRedoStack={setRedoStack}
+                                        />
+                            })}
+                            {Array.from(Array(16).keys()).map(colIndex => (
+                                <ASCIICell key={colIndex} hex={tryGetHexValue(virtualRow.index, colIndex, hex)} />
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
         </div>
-    </div>)
+    );
 }

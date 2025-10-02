@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import EditButton from "./EditButton";
 import FileButton from "./FileButton";
+import type { HexAction } from "../../App";
 
 export const MenuDisplay = {
     None: 0,
@@ -8,7 +9,15 @@ export const MenuDisplay = {
     Edit: 2,
 } as const;
 
-export default function Toolbar()
+export interface ToolbarProps
+{
+    undoStack: HexAction[]
+    redoStack: HexAction[]
+    setUndoStack: React.Dispatch<React.SetStateAction<HexAction[]>>
+    setRedoStack: React.Dispatch<React.SetStateAction<HexAction[]>>
+}
+
+export default function Toolbar({undoStack, redoStack, setUndoStack, setRedoStack} : ToolbarProps)
 {
     const [menuDisp, setMenuDisp] = useState<number>(MenuDisplay.None);
 
@@ -32,7 +41,7 @@ export default function Toolbar()
     return (  
         <div className="border-[#364153] border-2 h-8 bg-[#1e2939] flex">
             <FileButton ref={fileRef} menuDisp={menuDisp} setMenuDisp={setMenuDisp}/>
-            <EditButton ref={editRef} menuDisp={menuDisp} setMenuDisp={setMenuDisp}/>
+            <EditButton ref={editRef} menuDisp={menuDisp} setMenuDisp={setMenuDisp} undoStack={undoStack} redoStack={redoStack} setUndoStack={setUndoStack} setRedoStack={setRedoStack}/>
         </div>
     );
 }
